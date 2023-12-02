@@ -23,14 +23,11 @@ fn main() {
 
     let mut sum: u32 = 0;
     for game in games {
-        let mut possible = true;
-        for round in game.rounds {
-            if round.blue > MAX_BLUE || round.green > MAX_GREEN || round.red > MAX_RED {
-                possible = false;
-            }
-        }
-
-        if possible {
+        if !game
+            .rounds
+            .iter()
+            .any(|round| round.blue > MAX_BLUE || round.green > MAX_GREEN || round.red > MAX_RED)
+        {
             sum += game.id;
         }
     }
@@ -54,7 +51,6 @@ fn parse_game_line(game_line: &str) -> Game {
 
 fn parse_round(round_line: &str) -> Round {
     let parts = round_line.split(',').collect::<Vec<&str>>();
-    // [3 blue, 4 red]
     let mut round = Round {
         red: 0,
         green: 0,
