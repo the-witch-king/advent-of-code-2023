@@ -42,15 +42,13 @@ fn main() {
         let until = wins[id];
         let amount = amounts[id];
 
-        for _ in 0..amount {
-            for i in id..(id + (until as usize)) {
-                let index = i + 1;
-                if index >= length {
-                    break;
-                }
-
-                amounts[index] += 1;
+        for i in id..(id + (until as usize)) {
+            let index = i + 1;
+            if index >= length {
+                break;
             }
+
+            amounts[index] += amount;
         }
     }
 
