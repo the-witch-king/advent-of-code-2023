@@ -35,7 +35,7 @@ fn parse_round(round_line: &str) -> Round {
         blue: 0,
     };
     for part in parts {
-        let p = part.trim().split(' ').collect::<Vec<&str>>();
+t       let p = part.trim().split(' ').collect::<Vec<&str>>();
         let amount = p[0].parse::<u32>().unwrap();
         let color = p[1];
 
