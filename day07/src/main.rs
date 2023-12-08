@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, task::Wake};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Strength {
@@ -41,6 +41,7 @@ impl Ord for Hand {
                 }
             }
         }
+
         self.strength.cmp(&other.strength)
     }
 }
@@ -56,8 +57,8 @@ fn get_card_value(card: char) -> u32 {
         'A' => 100,
         'K' => 90,
         'Q' => 80,
-        'J' => 70,
         'T' => 10,
+        'J' => 1,
         other => String::from(other).parse::<u32>().unwrap(),
     }
 }
@@ -68,28 +69,50 @@ fn get_strength(cards: &str) -> Strength {
         *chars.entry(c).or_insert(0) += 1
     }
 
-    let values: Vec<&u32> = chars.values().collect::<Vec<&u32>>();
-    let length = values.len();
+    let mut distinct_count = chars.len() as u32;
 
-    match length {
-        1 => Strength::FiveOfAKind,
-        2 => {
-            if **values.iter().max().unwrap() == 4 {
-                Strength::FourOfAKind
-            } else {
-                Strength::FullHouse
-            }
-        }
-        3 => {
-            if **values.iter().max().unwrap() == 3 {
-                Strength::ThreeOfAKind
-            } else {
-                Strength::TwoPair
-            }
-        }
-        4 => Strength::OnePair,
-        _ => Strength::HighCard,
+    let jokers: u32 = *chars.get(&'J').unwrap_or(&0);
+    if jokers > 0 {
+        chars.remove(&'J');
     }
+
+    let values: Vec<&u32> = chars.values().collect::<Vec<&u32>>();
+    let mut max = **values.iter().max().unwrap_or(&&0);
+
+    if jokers > 0 {
+        distinct_count -= 1;
+        max += jokers;
+    }
+
+    if max >= 5 {
+        return if distinct_count <= 1 {
+            Strength::FiveOfAKind
+        } else {
+            Strength::FourOfAKind
+        };
+    }
+
+    if max == 4 {
+        return Strength::FourOfAKind;
+    }
+
+    if max == 3 {
+        return if distinct_count == 2 {
+            Strength::FullHouse
+        } else {
+            Strength::ThreeOfAKind
+        };
+    }
+
+    if max == 2 {
+        return if distinct_count == 3 {
+            Strength::TwoPair
+        } else {
+            Strength::OnePair
+        };
+    }
+
+    Strength::HighCard
 }
 
 fn make_hand_from_line(l: &str) -> Hand {
@@ -105,12 +128,12 @@ fn make_hand_from_line(l: &str) -> Hand {
 }
 
 fn main() {
-    // let input = include_str!("../input.txt");
-    let input = "32T3K 765
-    T55J5 684
-    KK677 28
-    KTJJT 220
-    QQQJA 483";
+    let input = include_str!("../input.txt");
+    //     let input = "32T3K 765
+    // T55J5 684
+    // KK677 28
+    // KTJJT 220
+    // QQQJA 483";
 
     let mut hands: Vec<Hand> = input
         .lines()
@@ -118,7 +141,6 @@ fn main() {
         .collect::<Vec<Hand>>();
 
     hands.sort();
-    // println!("Cards: {:?}", hands);
 
     let mut total_winnings = 0;
     for (rank, hand) in hands.iter().enumerate() {
@@ -140,7 +162,18 @@ mod tests {
         assert_eq!(get_strength("AAAQQ"), Strength::FullHouse);
         assert_eq!(get_strength("AAQQK"), Strength::TwoPair);
         assert_eq!(get_strength("KK463"), Strength::OnePair);
-        assert_eq!(get_strength("AKQJT"), Strength::HighCard);
+        assert_eq!(get_strength("AKQ5T"), Strength::HighCard);
+    }
+
+    #[test]
+    fn test_get_strength_with_jokers() {
+        assert_eq!(get_strength("JJJJA"), Strength::FiveOfAKind);
+        assert_eq!(get_strength("AAAJ1"), Strength::FourOfAKind);
+        assert_eq!(get_strength("AAJ31"), Strength::ThreeOfAKind);
+        assert_eq!(get_strength("AAAQQ"), Strength::FullHouse);
+        assert_eq!(get_strength("AJQKK"), Strength::ThreeOfAKind);
+        assert_eq!(get_strength("KJ463"), Strength::OnePair);
+        assert_eq!(get_strength("AKQ5T"), Strength::HighCard);
     }
 
     #[test]
@@ -195,6 +228,39 @@ mod tests {
     }
 
     #[test]
+    fn test_equivalence_with_joker() {
+        assert_eq!(get_card_value('J'), 1);
+    }
+
+    #[test]
+    fn test_sorting_with_joker() {
+        let mut items: [Hand; 2] = [
+            make_hand_from_line("QQQ2J 1"),
+            make_hand_from_line("QQQJA 2"),
+        ];
+
+        items.sort();
+
+        assert_eq!(items[0].bid, 2);
+        assert_eq!(items[1].bid, 1);
+    }
+
+    #[test]
+    fn test_more_sorting_with_jokers() {
+        let mut items: [Hand; 3] = [
+            make_hand_from_line("KTJJT 1"),
+            make_hand_from_line("T55J5 10"),
+            make_hand_from_line("QQQJA 100"),
+        ];
+
+        items.sort();
+
+        assert_eq!(items[0].bid, 10);
+        assert_eq!(items[1].bid, 100);
+        assert_eq!(items[2].bid, 1);
+    }
+
+    #[test]
     fn test_sorting() {
         let mut hands = [
             Hand {
@@ -231,5 +297,38 @@ mod tests {
         assert_eq!(hands[2].cards, "AAAQQ");
         assert_eq!(hands[3].cards, "AAAA5");
         assert_eq!(hands[4].cards, "AAAAA");
+    }
+
+    #[test]
+    fn test_five_of_a_kind() {
+        assert_eq!(get_strength("AAAAA"), Strength::FiveOfAKind);
+        assert_eq!(get_strength("AAAAJ"), Strength::FiveOfAKind);
+        assert_eq!(get_strength("JAAAJ"), Strength::FiveOfAKind);
+        assert_eq!(get_strength("JJAAJ"), Strength::FiveOfAKind);
+        assert_eq!(get_strength("JJJAJ"), Strength::FiveOfAKind);
+        assert_eq!(get_strength("JJJJJ"), Strength::FiveOfAKind);
+    }
+
+    #[test]
+    fn test_four_of_a_kind() {
+        assert_eq!(get_strength("AAAAQ"), Strength::FourOfAKind);
+        assert_eq!(get_strength("JAAAQ"), Strength::FourOfAKind);
+        assert_eq!(get_strength("JJAAQ"), Strength::FourOfAKind);
+        assert_eq!(get_strength("JJJAQ"), Strength::FourOfAKind);
+    }
+
+    #[test]
+    fn test_full_house() {
+        assert_eq!(get_strength("AAAQQ"), Strength::FullHouse);
+        assert_eq!(get_strength("AAQQQ"), Strength::FullHouse);
+        assert_eq!(get_strength("JAAQQ"), Strength::FullHouse);
+        assert_eq!(get_strength("AAQQJ"), Strength::FullHouse);
+    }
+
+    #[test]
+    fn test_three_of_a_kind() {
+        assert_eq!(get_strength("AAAQK"), Strength::ThreeOfAKind);
+        assert_eq!(get_strength("AAJQK"), Strength::ThreeOfAKind);
+        assert_eq!(get_strength("JAJQK"), Strength::ThreeOfAKind);
     }
 }
