@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::HashMap};
+use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Strength {
@@ -107,18 +107,25 @@ fn make_hand_from_line(l: &str) -> Hand {
 fn main() {
     // let input = include_str!("../input.txt");
     let input = "32T3K 765
-T55J5 684
-KK677 28
-KTJJT 220
-QQQJA 483";
+    T55J5 684
+    KK677 28
+    KTJJT 220
+    QQQJA 483";
 
-    let hands: Vec<Hand> = input
+    let mut hands: Vec<Hand> = input
         .lines()
         .map(make_hand_from_line)
         .collect::<Vec<Hand>>();
 
-    println!("Cards: {:?}", hands);
-    println!("They are equal? {}", hands[0] == hands[0]);
+    hands.sort();
+    // println!("Cards: {:?}", hands);
+
+    let mut total_winnings = 0;
+    for (rank, hand) in hands.iter().enumerate() {
+        total_winnings += (rank as u32 + 1) * hand.bid;
+    }
+
+    println!("Total winnings: {}", total_winnings);
 }
 
 #[cfg(test)]
